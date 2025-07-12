@@ -18,3 +18,5 @@ python-dotenv
 tgcrypto
 html-telegraph-poster
 uvloop
+torrentp
+ffmpeg
