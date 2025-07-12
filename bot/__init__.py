@@ -10,11 +10,14 @@ from pyrogram.enums import ParseMode
 from dotenv import load_dotenv
 from uvloop import install
 
+
 install()
-basicConfig(format="[%(asctime)s] [%(name)s | %(levelname)s] - %(message)s [%(filename)s:%(lineno)d]",
-            datefmt="%m/%d/%Y, %H:%M:%S %p",
-            handlers=[FileHandler('log.txt'), StreamHandler()],
-            level=INFO)
+basicConfig(
+    format="[%(asctime)s] [%(name)s | %(levelname)s] - %(message)s [%(filename)s:%(lineno)d]",
+    datefmt="%m/%d/%Y, %H:%M:%S %p",
+    handlers=[FileHandler('log.txt'), StreamHandler()],
+    level=INFO
+)
 
 getLogger("pyrogram").setLevel(ERROR)
 LOGS = getLogger(__name__)
@@ -27,7 +30,6 @@ ani_cache = {
     'completed': set()
 }
 ffpids_cache = list()
-
 ffLock = Lock()
 ffQueue = Queue()
 ff_queued = dict()
@@ -78,7 +80,15 @@ if not ospath.isdir("downloads/"):
     mkdir("downloads/")
 
 try:
-    bot = Client(name="AutoAniAdvance", api_id=Var.API_ID, api_hash=Var.API_HASH, bot_token=Var.BOT_TOKEN, plugins=dict(root="bot/modules"), parse_mode=ParseMode.HTML)
+    bot = Client(
+        name="AutoAniAdvance",
+        api_id=Var.API_ID,
+        api_hash=Var.API_HASH,
+        bot_token=Var.BOT_TOKEN,
+        plugins=dict(root="bot/modules"),
+        parse_mode=ParseMode.HTML
+    )
+    bot.uptime = datetime.now()  # Set uptime at initialization
     bot_loop = bot.loop
     sch = AsyncIOScheduler(timezone="Asia/Kolkata", event_loop=bot_loop)
 except Exception as ee:
