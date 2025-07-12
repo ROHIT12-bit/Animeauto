@@ -1,4 +1,4 @@
-FROM python:3.12-slim
+FROM python:3.10-slim-buster
 
 WORKDIR /usr/src/app
 RUN chmod 777 /usr/src/app
