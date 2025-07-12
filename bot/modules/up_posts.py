@@ -6,7 +6,7 @@ from aiohttp import ClientSession
 from bot import Var, bot, ffQueue
 from pyrogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 from pyrogram.errors import FloodWait, MessageNotModified
-from telegram.ext import Update
+from telegram import Update
 from telegram.constants import ParseMode
 from telegram.ext import CallbackContext, CommandHandler
 from pyrogram import filters
