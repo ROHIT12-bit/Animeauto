@@ -2,7 +2,7 @@ from asyncio import sleep as asleep, gather
 from pyrogram.filters import command, private, user
 from pyrogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 from pyrogram.errors import FloodWait, MessageNotModified
-from telegram import Update
+from telegram.ext import Update
 from telegram.constants import ParseMode
 from telegram.ext import CallbackContext, CommandHandler
 from pyrogram import filters
