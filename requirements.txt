@@ -1,3 +1,4 @@
+python-telegram-bot
 telegram
 aiohttp
 lxml_html_clean
