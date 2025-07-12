@@ -3,7 +3,7 @@ from aiofiles import open as aiopen
 from aiofiles.os import path as aiopath, remove as aioremove, mkdir
 
 from aiohttp import ClientSession
-from torrent import TorrentDownloader
+from torrentp import TorrentDownloader
 from bot import LOGS
 from bot.core.func_utils import handle_logs
 
