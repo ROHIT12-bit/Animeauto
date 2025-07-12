@@ -9,7 +9,7 @@ from pyrogram.errors import FloodWait, MessageNotModified
 from telegram import Update
 from telegram import ParseMode
 from telegram.ext import CallbackContext, CommandHandler
-from pyrogram import Clients, filters
+from pyrogram import Client, filters
 from bot.core.text_utils import TextEditor
 from bot.core.reporter import rep
 from bot.core.func_utils import decode, is_fsubbed, get_fsubs, editMessage, sendMessage, new_task, convertTime, getfeed
