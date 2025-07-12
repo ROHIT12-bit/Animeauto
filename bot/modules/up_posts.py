@@ -7,7 +7,7 @@ from bot import Var, bot, ffQueue
 from pyrogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 from pyrogram.errors import FloodWait, MessageNotModified
 from telegram import Update
-from telegram.constants import ParseMode
+from telegram import ParseMode
 from telegram.ext import CallbackContext, CommandHandler
 from pyrogram import filters
 from bot.core.text_utils import TextEditor
