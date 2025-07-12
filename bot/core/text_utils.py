@@ -11,7 +11,7 @@ from .func_utils import handle_logs
 from .reporter import rep
 
 CAPTION_FORMAT = """
-<b><i>{title}</i></b>
+<b>㊂ <i>{title}</i></b>
 <b>━━━━━━━━━━━━━━━━━━━</b>
 <b>‣</b> <i>Season:</i> <i>{anime_season}</i>
 <b>‣</b> <i>Episode:</i> <i>{ep_no}</i>
@@ -21,9 +21,18 @@ CAPTION_FORMAT = """
 <b>‣</b> <i>Total Episodes:</i> <i>{t_eps}</i>
 <b>‣</b> <i>Genres:</i> <i>{genres}</i>
 <b>━━━━━━━━━━━━━━━━━━━</b>
+╭┅┅┅┅┅┅┅┅┅┅┅┅┅┅┅┅┅┅┅┅
+⌬  <b><i>Powered By</i></b> ~ </i></b><b><i>{cred}</i></b>
+╰┅┅┅┅┅┅┅┅┅┅┅┅┅┅┅┅┅┅┅┅
 """
 
-GENRES_EMOJI = {"Action": "👊", "Adventure": choice(['🪂', '🧗‍♀']), "Comedy": "🤣", "Drama": " 🎭", "Ecchi": choice(['💋', '🥵']), "Fantasy": choice(['🧞', '🧞‍♂', '🧞‍♀','🌗']), "Hentai": "🔞", "Horror": "☠", "Mahou Shoujo": "☯", "Mecha": "🤖", "Music": "🎸", "Mystery": "🔮", "Psychological": "♟", "Romance": "💞", "Sci-Fi": "🛸", "Slice of Life": choice(['☘','🍁']), "Sports": "⚽️", "Supernatural": "🫧", "Thriller": choice(['🥶', '🔪','🤯'])}
+GENRES_EMOJI = {
+    "Action": "👊", "Adventure": choice(['🪂', '🧗‍♀']), "Comedy": "🤣",
+    "Drama": " 🎭", "Ecchi": choice(['💋', '🥵']), "Fantasy": choice(['🧞', '🧞‍ atualmente', '🧞‍♀', '🌗']),
+    "Hentai": "🔞", "Horror": "☠", "Mahou Shoujo": "☯", "Mecha": "🤖", "Mystery": "🔮",
+    "Psychological": "♟", "Romance": "💞", "Sci-Fi": "🛸",
+    "Slice of Life": choice(['☘', '🍁']), "Sports": "⚽️", "Supernatural": "🫧", "Thriller": choice(['🥶', '🔪', '🤯'])
+}
 
 ANIME_GRAPHQL_QUERY = """
 query ($id: Int, $search: String, $seasonYear: Int) {
@@ -77,8 +86,8 @@ query ($id: Int, $search: String, $seasonYear: Int) {
     favourites
     studios {
       nodes {
-         name
-         siteUrl
+        name
+        siteUrl
       }
     }
     isAdult
@@ -110,20 +119,38 @@ class AniLister:
         self.__api = "https://graphql.anilist.co"
         self.__ani_name = anime_name
         self.__ani_year = year
-        self.__vars = {'search' : self.__ani_name, 'seasonYear': self.__ani_year}
+        self.__vars = {'search': self.__ani_name, 'seasonYear': self.__ani_year}
     
     def __update_vars(self, year=True) -> None:
         if year:
             self.__ani_year -= 1
             self.__vars['seasonYear'] = self.__ani_year
         else:
-            self.__vars = {'search' : self.__ani_name}
+            self.__vars = {'search': self.__ani_name}
     
     async def post_data(self):
-        async with ClientSession() as sess:
-            async with sess.post(self.__api, json={'query': ANIME_GRAPHQL_QUERY, 'variables': self.__vars}) as resp:
-                return (resp.status, await resp.json(), resp.headers)
-        
+        try:
+            async with ClientSession() as sess:
+                async with sess.post(
+                    self.__api,
+                    json={'query': ANIME_GRAPHQL_QUERY, 'variables': self.__vars},
+                    timeout=15
+                ) as resp:
+                    if resp.status != 200:
+                        return (resp.status, None, resp.headers)
+
+                    if resp.content_type != "application/json":
+                        raise ContentTypeError(
+                            resp.request_info,
+                            resp.history,
+                            message=f"Unexpected content-type: {resp.content_type}"
+                        )
+
+                    return (resp.status, await resp.json(), resp.headers)
+        except Exception as e:
+            await rep.report(f"AniList API Error: {str(e)}", "error")
+            return (500, None, {})
+
     async def get_anidata(self):
         res_code, resp_json, res_heads = await self.post_data()
         while res_code == 404 and self.__ani_year > 2020:
@@ -138,7 +165,7 @@ class AniLister:
         if res_code == 200:
             return resp_json.get('data', {}).get('Media', {}) or {}
         elif res_code == 429:
-            f_timer = int(res_heads['Retry-After'])
+            f_timer = int(res_heads.get('Retry-After', 60))
             await rep.report(f"AniList API FloodWait: {res_code}, Sleeping for {f_timer} !!", "error")
             await asleep(f_timer)
             return await self.get_anidata()
@@ -149,7 +176,7 @@ class AniLister:
         else:
             await rep.report(f"AniList API Error: {res_code}", "error", log=False)
             return {}
-    
+
 class TextEditor:
     def __init__(self, name):
         self.__name = name
@@ -211,16 +238,16 @@ class TextEditor:
         titles = self.adata.get("title", {})
         
         return CAPTION_FORMAT.format(
-                title=titles.get('english') or titles.get('romaji') or titles.get('native'),
-                form=self.adata.get("format") or "N/A",
-                genres=", ".join(f"{x.replace(' ', ' ').replace('_', '-')}" for x in (self.adata.get('genres') or [])),
-                avg_score=f"{sc}%" if (sc := self.adata.get('averageScore')) else "N/A",
-                status=self.adata.get("status") or "N/A",
-                start_date=startdate or "N/A",
-                end_date=enddate or "N/A",
-                t_eps=self.adata.get("episodes") or "N/A",
-                anime_season = str(ani_s[-1]) if (ani_s := self.pdata.get('anime_season', '01')) and isinstance(ani_s, list) else str(ani_s),
-                plot= (desc if (desc := self.adata.get("description") or "N/A") and len(desc) < 200 else desc[:200] + "..."),
-                ep_no=self.pdata.get("episode_number"),
-                cred=Var.BRAND_UNAME,
-            )
+            title=titles.get('english') or titles.get('romaji') or titles.get('native'),
+            form=self.adata.get("format") or "N/A",
+            genres=", ".join(f"{x.replace(' ', ' ').replace('_', '-')}" for x in (self.adata.get('genres') or [])),
+            avg_score=f"{sc}%" if (sc := self.adata.get('averageScore')) else "N/A",
+            status=self.adata.get("status") or "N/A",
+            start_date=startdate or "N/A",
+            end_date=enddate or "N/A",
+            t_eps=self.adata.get("episodes") or "N/A",
+            anime_season=str(ani_s[-1]) if (ani_s := self.pdata.get('anime_season', '01')) and isinstance(ani_s, list) else str(ani_s),
+            plot=(desc if (desc := self.adata.get("description") or "N/A") and len(desc) < 200 else desc[:200] + "..."),
+            ep_no=self.pdata.get("episode_number"),
+            cred=Var.BRAND_UNAME,
+        )
