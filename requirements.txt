@@ -1,4 +1,4 @@
-python-telegram-bot
+python-telegram-bot==20.5
 telegram
 aiohttp
 lxml_html_clean
