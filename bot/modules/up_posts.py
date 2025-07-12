@@ -9,13 +9,12 @@ from pyrogram.errors import FloodWait, MessageNotModified
 from telegram import Update
 from telegram import ParseMode
 from telegram.ext import CallbackContext, CommandHandler
-from pyrogram import filters
+from pyrogram import Clients, filters
 from bot.core.text_utils import TextEditor
 from bot.core.reporter import rep
 from bot.core.func_utils import decode, is_fsubbed, get_fsubs, editMessage, sendMessage, new_task, convertTime, getfeed
 from asyncio import sleep as asleep, gather
 from pyrogram.filters import command, private, user
-from pyrogram import filters
 import time
 from datetime import datetime
 from motor.motor_asyncio import AsyncIOMotorClient
@@ -27,7 +26,7 @@ from pyrogram.errors import FloodWait, MessageNotModified
 
 from bot import bot, bot_loop, Var, ani_cache
 
-DB_URI = "mongodb+srv://nitinkumardhundhara:DARKXSIDE78@cluster0.wdive.mongodb.net/?retryWrites=true&w=majority"
+DB_URI = "mongodb+srv://vinayjaat698:jaat@jaat.olaya.mongodb.net/?retryWrites=true&w=majority&appName=jaat"
 mongo_client = AsyncIOMotorClient(DB_URI)
 db = mongo_client['AutoAniOngoing']
 
