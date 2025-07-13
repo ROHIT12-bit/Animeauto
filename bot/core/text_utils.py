@@ -179,7 +179,8 @@ class AniLister:
         if resp.content_type == "text/xml":
             return (resp.status, await resp.text(), resp.headers)
         return (resp.status, await resp.json(), resp.headers)
-
+        
+    @handle_logs
     async def _parse_kitsu_data(self, data):
         if not data or not data.get("data"):
             return {}
@@ -210,7 +211,8 @@ class AniLister:
             "averageScore": attributes.get("averageRating"),
             "coverImage": {"large": attributes.get("posterImage", {}).get("large")}
         }
-
+        
+    @handle_logs
     async def _parse_anilist_data(self, data):
         if not data or not data.get("data", {}).get("Media"):
             return {}
@@ -228,7 +230,8 @@ class AniLister:
             "averageScore": anime.get("averageScore"),
             "coverImage": anime.get("coverImage", {})
         }
-
+        
+    @handle_logs
     async def _parse_jikan_data(self, data):
         if not data or not data.get("data"):
             return {}
@@ -258,7 +261,8 @@ class AniLister:
             "averageScore": anime.get("score") * 10 if anime.get("score") else None,
             "coverImage": {"large": anime.get("images", {}).get("jpg", {}).get("large_image_url")}
         }
-
+        
+    @handle_logs
     async def _parse_ann_data(self, xml_data):
         try:
             root = ET.fromstring(xml_data)
@@ -289,7 +293,8 @@ class AniLister:
         except Exception as e:
             await rep.report(f"ANN XML Parsing Error: {str(e)}", "error")
             return {}
-
+            
+    @handle_logs
     async def get_anidata(self):
         # Try Kitsu API first
         params = {"filter[text]": self.__ani_name, "filter[seasonYear]": self.__ani_year}
@@ -405,7 +410,10 @@ class TextEditor:
     @handle_logs
     async def get_poster(self):
         if anime_id := await self.get_id():
-            return f"https://img.anili.st/media/{anime_id} or self.adata.get("coverImage", {}).get("large")"
+            # Check if data is from AniList by verifying AniList-specific fields
+            if self.adata.get("idMal") or "Media" in self.adata:  # AniList data has 'idMal' or comes from 'Media' key
+                return f"https://img.anili.st/media/{anime_id}"
+        # Default fallback image if AniList data or anime_id is unavailable
         return "https://envs.sh/YsH.jpg"
 
     @handle_logs
