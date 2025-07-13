@@ -16,7 +16,6 @@ CAPTION_FORMAT = """
 <b>‣</b> <i>Season:</i> <i>{anime_season}</i>
 <b>‣</b> <i>Episode:</i> <i>{ep_no}</i>
 <b>‣</b> <i>Language: Japanese [ESub]</i>
-<b>‣</b> <i>Score:</i> <i>{avg_score}</i>
 <b>‣</b> <i>Status:</i> <i>{status}</i>
 <b>‣</b> <i>Total Episodes:</i> <i>{t_eps}</i>
 <b>‣</b> <i>Genres:</i> <i>{genres}</i>
