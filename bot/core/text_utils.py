@@ -2,7 +2,7 @@ from calendar import month_name
 from datetime import datetime
 from random import choice
 from asyncio import sleep as asleep
-from aiohttp import ClientSession
+from aiohttp import ClientSession, ClientResponseError
 import xml.etree.ElementTree as ET
 from anitopy import parse
 from bot import Var, bot
@@ -34,7 +34,6 @@ GENRES_EMOJI = {
     "Slice of Life": choice(['☘', '🍁']), "Sports": "⚽️", "Supernatural": "🫧", "Thriller": choice(['🥶', '🔪', '🤯'])
 }
 
-# Genre normalization mapping for API-specific genres
 GENRE_NORMALIZATION = {
     "Action & Adventure": "Action",
     "Romantic Comedy": "Comedy",
@@ -137,11 +136,10 @@ query ($id: Int, $search: String, $seasonYear: Int) {
 def normalize_genres(genres: list) -> list:
     """Normalize API-specific genres to match GENRES_EMOJI keys."""
     normalized = []
-    for genre in genres:
-        # Check if genre is in normalization mapping
+    for genre in genres or []:
         genre_key = GENRE_NORMALIZATION.get(genre, genre)
-        # If still not in GENRES_EMOJI, use the original genre or a default
-        normalized.append(genre_key if genre_key in GENRES_EMOJI else genre)
+        if genre_key in GENRES_EMOJI:
+            normalized.append(genre_key)
     return normalized
 
 class AniLister:
@@ -153,6 +151,7 @@ class AniLister:
         self.__ani_name = anime_name
         self.__ani_year = year
         self.__anilist_vars = {'search': self.__ani_name, 'seasonYear': self.__ani_year}
+        self.__anilist_retries = 3  # Limit AniList retries to avoid floodwait loops
 
     async def post_data(self, api: str, params: dict = None, json: dict = None, headers: dict = None):
         try:
@@ -171,16 +170,16 @@ class AniLister:
         if resp.status != 200:
             return (resp.status, None, resp.headers)
         if resp.content_type not in ["application/json", "text/xml"]:
-            raise ContentTypeError(
+            raise ClientResponseError(
                 resp.request_info,
                 resp.history,
+                status=resp.status,
                 message=f"Unexpected content-type: {resp.content_type}"
             )
         if resp.content_type == "text/xml":
             return (resp.status, await resp.text(), resp.headers)
         return (resp.status, await resp.json(), resp.headers)
-        
-    @handle_logs
+
     async def _parse_kitsu_data(self, data):
         if not data or not data.get("data"):
             return {}
@@ -211,8 +210,7 @@ class AniLister:
             "averageScore": attributes.get("averageRating"),
             "coverImage": {"large": attributes.get("posterImage", {}).get("large")}
         }
-        
-    @handle_logs
+
     async def _parse_anilist_data(self, data):
         if not data or not data.get("data", {}).get("Media"):
             return {}
@@ -220,6 +218,7 @@ class AniLister:
         genres = normalize_genres(anime.get("genres", []))
         return {
             "id": anime.get("id"),
+            "idMal": anime.get("idMal"),
             "title": anime.get("title", {}),
             "status": anime.get("status", "").replace("_", " ").title(),
             "description": anime.get("description"),
@@ -230,8 +229,7 @@ class AniLister:
             "averageScore": anime.get("averageScore"),
             "coverImage": anime.get("coverImage", {})
         }
-        
-    @handle_logs
+
     async def _parse_jikan_data(self, data):
         if not data or not data.get("data"):
             return {}
@@ -261,8 +259,7 @@ class AniLister:
             "averageScore": anime.get("score") * 10 if anime.get("score") else None,
             "coverImage": {"large": anime.get("images", {}).get("jpg", {}).get("large_image_url")}
         }
-        
-    @handle_logs
+
     async def _parse_ann_data(self, xml_data):
         try:
             root = ET.fromstring(xml_data)
@@ -270,6 +267,8 @@ class AniLister:
             if not anime:
                 return {}
             genres = normalize_genres([g.text for g in anime.findall("info[@type='Genres']/genre")])
+            vintage = anime.findtext("info[@type='Vintage']")
+            status = "Finished Airing" if vintage and "-" in vintage else "Currently Airing"
             return {
                 "id": anime.get("id"),
                 "title": {
@@ -277,11 +276,11 @@ class AniLister:
                     "romaji": anime.findtext("name[@type='japanese']"),
                     "native": anime.findtext("name[@type='japanese']")
                 },
-                "status": None,  # ANN doesn't provide status directly
+                "status": status,
                 "description": anime.findtext("info[@type='Plot Summary']"),
                 "startDate": {
-                    "year": anime.findtext("info[@type='Vintage']").split("-")[0] if anime.findtext("info[@type='Vintage']") else None,
-                    "month": anime.findtext("info[@type='Vintage']").split("-")[1] if anime.findtext("info[@type='Vintage']") and len(anime.findtext("info[@type='Vintage']").split("-")) > 1 else None,
+                    "year": vintage.split("-")[0] if vintage else None,
+                    "month": vintage.split("-")[1] if vintage and len(vintage.split("-")) > 1 else None,
                     "day": None
                 },
                 "endDate": {"year": None, "month": None, "day": None},
@@ -293,8 +292,29 @@ class AniLister:
         except Exception as e:
             await rep.report(f"ANN XML Parsing Error: {str(e)}", "error")
             return {}
-            
-    @handle_logs
+
+    async def get_anilist_id(self, mal_id: int = None, name: str = None, year: int = None):
+        """Attempt to fetch AniList ID using MAL ID or name/year."""
+        if mal_id:
+            variables = {'idMal': mal_id}
+        else:
+            variables = {'search': name, 'seasonYear': year} if year else {'search': name}
+        res_code, resp_json, res_heads = await self.post_data(
+            self.__anilist_api,
+            json={'query': ANIME_GRAPHQL_QUERY, 'variables': variables}
+        )
+        if res_code == 200 and resp_json.get('data', {}).get('Media'):
+            return resp_json['data']['Media']['id']
+        elif res_code == 429:
+            f_timer = int(res_heads.get('Retry-After', 120))
+            await rep.report(f"AniList ID Fetch Rate Limit: Sleeping for {f_timer}s", "error")
+            if self.__anilist_retries > 0:
+                self.__anilist_retries -= 1
+                await asleep(f_timer)
+                return await self.get_anilist_id(mal_id, name, year)
+        await rep.report(f"Failed to fetch AniList ID for {name or mal_id}", "error")
+        return None
+
     async def get_anidata(self):
         # Try Kitsu API first
         params = {"filter[text]": self.__ani_name, "filter[seasonYear]": self.__ani_year}
@@ -308,40 +328,7 @@ class AniLister:
             await asleep(f_timer)
             return await self.get_anidata()
 
-        # Fallback to AniList API
-        while res_code == 404 and self.__ani_year > 2020:
-            self.__anilist_vars['seasonYear'] = self.__ani_year
-            res_code, resp_json, res_heads = await self.post_data(
-                self.__anilist_api,
-                json={'query': ANIME_GRAPHQL_QUERY, 'variables': self.__anilist_vars}
-            )
-            if res_code == 200 and resp_json.get('data', {}).get('Media'):
-                await rep.report(f"AniList API Success: {self.__ani_name}", "info")
-                return await self._parse_anilist_data(resp_json)
-            self.__ani_year -= 1
-            await rep.report(f"AniList Query: {self.__ani_name}, Retrying with {self.__ani_year}", "warning", log=False)
-
-        if res_code == 404:
-            self.__anilist_vars = {'search': self.__ani_name}
-            res_code, resp_json, res_heads = await self.post_data(
-                self.__anilist_api,
-                json={'query': ANIME_GRAPHQL_QUERY, 'variables': self.__anilist_vars}
-            )
-            if res_code == 200 and resp_json.get('data', {}).get('Media'):
-                await rep.report(f"AniList API Success (no year): {self.__ani_name}", "info")
-                return await self._parse_anilist_data(resp_json)
-
-        if res_code == 429:
-            f_timer = int(res_heads.get('Retry-After', 60))
-            await rep.report(f"AniList API Rate Limit: Sleeping for {f_timer}s", "error")
-            await asleep(f_timer)
-            return await self.get_anidata()
-        elif res_code in [500, 501, 502]:
-            await rep.report(f"AniList API Server Error: {res_code}, Waiting 5s", "error")
-            await asleep(5)
-            return await self.get_anidata()
-
-        # Fallback to Jikan API
+        # Fallback to Jikan API (second priority)
         params = {"q": self.__ani_name, "year": self.__ani_year}
         res_code, resp_data, res_heads = await self.post_data(self.__jikan_api, params=params)
         if res_code == 200 and resp_data.get("data"):
@@ -353,7 +340,48 @@ class AniLister:
             await asleep(f_timer)
             return await self.get_anidata()
 
-        # Fallback to ANN API
+        # Fallback to AniList API (third priority due to floodwait errors)
+        for year in range(self.__ani_year, 2020, -1):
+            self.__anilist_vars['seasonYear'] = year
+            res_code, resp_json, res_heads = await self.post_data(
+                self.__anilist_api,
+                json={'query': ANIME_GRAPHQL_QUERY, 'variables': self.__anilist_vars}
+            )
+            if res_code == 200 and resp_json.get('data', {}).get('Media'):
+                await rep.report(f"AniList API Success: {self.__ani_name}", "info")
+                return await self._parse_anilist_data(resp_json)
+            elif res_code == 429:
+                f_timer = int(res_heads.get('Retry-After', 120))
+                await rep.report(f"AniList API Rate Limit: Sleeping for {f_timer}s", "error")
+                if self.__anilist_retries > 0:
+                    self.__anilist_retries -= 1
+                    await asleep(f_timer)
+                    continue
+                await rep.report(f"AniList Retry Limit Exhausted for {self.__ani_name}", "error")
+                break
+            elif res_code in [500, 501, 502]:
+                await rep.report(f"AniList API Server Error: {res_code}, Waiting 5s", "error")
+                await asleep(5)
+                continue
+
+        # Try AniList without year as a further attempt
+        self.__anilist_vars = {'search': self.__ani_name}
+        res_code, resp_json, res_heads = await self.post_data(
+            self.__anilist_api,
+            json={'query': ANIME_GRAPHQL_QUERY, 'variables': self.__anilist_vars}
+        )
+        if res_code == 200 and resp_json.get('data', {}).get('Media'):
+            await rep.report(f"AniList API Success (no year): {self.__ani_name}", "info")
+            return await self._parse_anilist_data(resp_json)
+        elif res_code == 429:
+            f_timer = int(res_heads.get('Retry-After', 120))
+            await rep.report(f"AniList API Rate Limit (no year): Sleeping for {f_timer}s", "error")
+            if self.__anilist_retries > 0:
+                self.__anilist_retries -= 1
+                await asleep(f_timer)
+                return await self.get_anidata()
+
+        # Fallback to ANN API (last priority)
         params = {"title": self.__ani_name, "type": "anime"}
         res_code, resp_data, res_heads = await self.post_data(self.__ann_api, params=params)
         if res_code == 200 and resp_data:
@@ -375,6 +403,7 @@ class TextEditor:
         self.__name = name
         self.adata = {}
         self.pdata = parse(name)
+        self.anilister = AniLister(self.__name, datetime.now().year)
 
     async def load_anilist(self):
         cache_names = []
@@ -409,11 +438,18 @@ class TextEditor:
 
     @handle_logs
     async def get_poster(self):
-        if anime_id := await self.get_id():
-            # Check if data is from AniList by verifying AniList-specific fields
-            if self.adata.get("idMal") or "Media" in self.adata:  # AniList data has 'idMal' or comes from 'Media' key
-                return f"https://img.anili.st/media/{anime_id}"
-        # Default fallback image if AniList data or anime_id is unavailable
+        # Try to get AniList ID regardless of API source
+        anime_id = None
+        if self.adata.get("idMal") or "Media" in self.adata:  # AniList data
+            anime_id = self.adata.get("id")
+        elif self.adata.get("id"):  # Jikan, Kitsu, or ANN data
+            mal_id = self.adata.get("id") if "mal_id" in self.adata else None
+            name = self.adata.get("title", {}).get("romaji") or self.adata.get("title", {}).get("english") or self.__name
+            year = self.adata.get("startDate", {}).get("year") or self.anilister._AniLister__ani_year
+            anime_id = await self.anilister.get_anilist_id(mal_id=mal_id, name=name, year=year)
+        
+        if anime_id and str(anime_id).isdigit():
+            return f"https://img.anili.st/media/{anime_id}"
         return "https://envs.sh/YsH.jpg"
 
     @handle_logs
@@ -430,22 +466,30 @@ class TextEditor:
     @handle_logs
     async def get_caption(self):
         sd = self.adata.get('startDate', {})
-        startdate = f"{month_name[int(sd['month'])]} {sd['day']}, {sd['year']}" if sd.get('day') and sd.get('year') and sd.get('month') else "N/A"
+        try:
+            month_idx = int(sd.get('month')) if sd.get('month') else None
+            startdate = f"{month_name[month_idx]} {sd['day']}, {sd['year']}" if sd.get('day') and sd.get('year') and month_idx else "N/A"
+        except (ValueError, TypeError):
+            startdate = "N/A"
         ed = self.adata.get('endDate', {})
-        enddate = f"{month_name[int(ed['month'])]} {ed['day']}, {ed['year']}" if ed.get('day') and ed.get('year') and ed.get('month') else "N/A"
+        try:
+            month_idx = int(ed.get('month')) if ed.get('month') else None
+            enddate = f"{month_name[month_idx]} {ed['day']}, {ed['year']}" if ed.get('day') and ed.get('year') and month_idx else "N/A"
+        except (ValueError, TypeError):
+            enddate = "N/A"
         titles = self.adata.get("title", {})
         
         return CAPTION_FORMAT.format(
             title=titles.get('english') or titles.get('romaji') or titles.get('native') or "N/A",
             form=self.adata.get("format") or "N/A",
-            genres=", ".join(f"{GENRES_EMOJI.get(x, '📺')} #{x.replace(' ', '_').replace('-', '_')}" for x in (self.adata.get('genres') or [])),
+            genres=", ".join(f"{GENRES_EMOJI[x]} #{x.replace(' ', '_').replace('-', '_')}" for x in (self.adata.get('genres') or [])),
             avg_score=f"{sc}%" if (sc := self.adata.get('averageScore')) else "N/A",
             status=self.adata.get("status") or "N/A",
             start_date=startdate,
             end_date=enddate,
             t_eps=self.adata.get("episodes") or "N/A",
             anime_season=str(ani_s[-1]) if (ani_s := self.pdata.get('anime_season', '01')) and isinstance(ani_s, list) else str(ani_s),
-            plot=(desc if (desc := self.adata.get("description") or "N/A") and len(desc) < 200 else desc[:200] + "..."),
+            plot=(desc if (desc := self.adata.get("description") or "N/A") and len(desc) < 200 else desc[:200] + "...") if self.adata.get("description") else "N/A",
             ep_no=self.pdata.get("episode_number") or "N/A",
             cred=Var.BRAND_UNAME,
         )
