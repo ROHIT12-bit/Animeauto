@@ -12,14 +12,14 @@ from .reporter import rep
 
 CAPTION_FORMAT = """
 <blockquote><b>㊂ <i>{title}</i></b></blockquote>
-<b>━━━━━━━━━━━━━━━━━━━</b>
+<b>╔━━━━━━━━━━━━━━━━━━━━━╗</b>
 <blockquote><b>‣</b> <i>Sᴇᴀsᴏɴ:</i> <i>{anime_season}</i>
 <b>‣</b> <i>Eᴘɪsᴏᴅᴇ:</i> <i>{ep_no}</i></blockquote>
 <blockquote><b>‣</b> <i>Aᴜᴅɪᴏ: Japanese [ESub]</i>
 <b>‣</b> <i>Sᴛᴀᴛᴜs:</i> <i>{status}</i></blockquote>
 <blockquote><b>‣</b> <i>Tᴏᴛᴀʟ Eᴘɪsᴏᴅᴇs:</i> <i>{t_eps}
 <b>‣</b> <i>Gᴇɴʀᴇs:</i> <i>{genres}</i></blockquote>
-<b>━━━━━━━━━━━━━━━━━━━</b>
+<b>╚━━━━━━━━━━━━━━━━━━━━━╝</b>
 ╭┅┅┅┅┅┅┅┅┅┅┅┅┅┅┅┅┅┅┅┅
 ⌬ <b><i>Pᴏᴡᴇʀᴇᴅ Bʏ</i></b> ~ </i></b><b><i>{cred}</i></b>
 ╰┅┅┅┅┅┅┅┅┅┅┅┅┅┅┅┅┅┅┅┅
