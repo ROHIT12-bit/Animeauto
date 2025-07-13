@@ -418,10 +418,7 @@ class TextEditor:
             self.anilister._AniLister__ani_name = ani_name  # Update AniLister's name
             self.adata = await self.anilister.get_anidata()
             if self.adata:
-                await rep.report(f"Used name variation: {ani_name}", "info", log=False)
-                break  # Stop after first successful API call
-        if not self.adata:
-            await rep.report(f"No data found for any name variation of {self.__name}", "error")
+                break  
 
     @handle_logs
     async def get_id(self):
