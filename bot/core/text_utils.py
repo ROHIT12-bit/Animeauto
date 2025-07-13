@@ -179,7 +179,8 @@ class AniLister:
         if resp.content_type == "text/xml":
             return (resp.status, await resp.text(), resp.headers)
         return (resp.status, await resp.json(), resp.headers)
-
+    
+    @handle_logs
     async def _parse_kitsu_data(self, data):
         if not data or not data.get("data"):
             return {}
@@ -211,6 +212,7 @@ class AniLister:
             "coverImage": {"large": attributes.get("posterImage", {}).get("large")}
         }
 
+    @handle_logs
     async def _parse_anilist_data(self, data):
         if not data or not data.get("data", {}).get("Media"):
             return {}
@@ -230,6 +232,7 @@ class AniLister:
             "coverImage": anime.get("coverImage", {})
         }
 
+    @handle_logs
     async def _parse_jikan_data(self, data):
         if not data or not data.get("data"):
             return {}
@@ -260,6 +263,7 @@ class AniLister:
             "coverImage": {"large": anime.get("images", {}).get("jpg", {}).get("large_image_url")}
         }
 
+    @handle_logs
     async def _parse_ann_data(self, xml_data):
         try:
             root = ET.fromstring(xml_data)
@@ -293,6 +297,7 @@ class AniLister:
             await rep.report(f"ANN XML Parsing Error: {str(e)}", "error")
             return {}
 
+    @handle_logs
     async def get_anilist_id(self, mal_id: int = None, name: str = None, year: int = None):
         """Attempt to fetch AniList ID using MAL ID or name/year."""
         if mal_id:
@@ -315,6 +320,7 @@ class AniLister:
         await rep.report(f"Failed to fetch AniList ID for {name or mal_id}", "error")
         return None
 
+    @handle_logs
     async def get_anidata(self):
         # Try Kitsu API first
         params = {"filter[text]": self.__ani_name, "filter[seasonYear]": self.__ani_year}
