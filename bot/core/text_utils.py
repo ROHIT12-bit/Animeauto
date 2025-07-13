@@ -405,7 +405,7 @@ class TextEditor:
     @handle_logs
     async def get_poster(self):
         if anime_id := await self.get_id():
-            return self.adata.get("coverImage", {}).get("large") or f"https://img.anili.st/media/{anime_id}"
+            return f"https://img.anili.st/media/{anime_id} or self.adata.get("coverImage", {}).get("large")"
         return "https://envs.sh/YsH.jpg"
 
     @handle_logs
