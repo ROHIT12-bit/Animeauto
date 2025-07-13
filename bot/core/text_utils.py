@@ -179,7 +179,7 @@ class AniLister:
             return (resp.status, await resp.text(), resp.headers)
         return (resp.status, await resp.json(), resp.headers)
 
-
+    @handle_logs
     async def _parse_kitsu_data(self, data):
         if not data or not data.get("data"):
             return {}
@@ -211,6 +211,7 @@ class AniLister:
             "coverImage": {"large": attributes.get("posterImage", {}).get("large")}
         }
 
+    @handle_logs
     async def _parse_anilist_data(self, data):
         if not data or not data.get("data", {}).get("Media"):
             return {}
@@ -230,6 +231,7 @@ class AniLister:
             "coverImage": anime.get("coverImage", {})
         }
 
+    @handle_logs
     async def _parse_jikan_data(self, data):
         if not data or not data.get("data"):
             return {}
@@ -260,6 +262,7 @@ class AniLister:
             "coverImage": {"large": anime.get("images", {}).get("jpg", {}).get("large_image_url")}
         }
 
+    @handle_logs
     async def _parse_ann_data(self, xml_data):
         try:
             root = ET.fromstring(xml_data)
@@ -293,6 +296,7 @@ class AniLister:
             await rep.report(f"ANN XML Parsing Error: {str(e)}", "error")
             return {}
 
+    @handle_logs
     async def get_anilist_id(self, mal_id: int = None, name: str = None, year: int = None):
         """Attempt to fetch AniList ID using MAL ID or name/year."""
         if mal_id:
@@ -317,9 +321,9 @@ class AniLister:
 
     async def get_anidata(self):
         params = {"filter[text]": self.__ani_name, "filter[seasonYear]": self.__ani_year}
-        res_code, resp_data, res_heads = await self.post_data(self.__kitsu_api, params=params)
+        res_code, resp_data, res_heads = await self.post_data(self.__kitsu_api, params=params, headers={'Accept': 'application/vnd.api+json'})
         if res_code == 200 and resp_data.get("data"):
-            await rep.report(f"Kitsu API Success: {self.__ani_name}", "info")
+            await rep.report(f"Kitsu API Success: {self.__ani_name}", "info", log=False)
             return await self._parse_kitsu_data(resp_data)
         elif res_code == 429:
             f_timer = int(res_heads.get('Retry-After', 60))
@@ -331,7 +335,7 @@ class AniLister:
         params = {"q": self.__ani_name, "year": self.__ani_year}
         res_code, resp_data, res_heads = await self.post_data(self.__jikan_api, params=params)
         if res_code == 200 and resp_data.get("data"):
-            await rep.report(f"Jikan API Success: {self.__ani_name}", "info")
+            await rep.report(f"Jikan API Success: {self.__ani_name}", "info", log=False)
             return await self._parse_jikan_data(resp_data)
         elif res_code == 429:
             f_timer = int(res_heads.get('Retry-After', 3))
@@ -347,7 +351,7 @@ class AniLister:
                 json={'query': ANIME_GRAPHQL_QUERY, 'variables': self.__anilist_vars}
             )
             if res_code == 200 and resp_json.get('data', {}).get('Media'):
-                await rep.report(f"AniList API Success: {self.__ani_name}", "info")
+                await rep.report(f"AniList API Success: {self.__ani_name}", "info", log=False)
                 return await self._parse_anilist_data(resp_json)
             elif res_code == 429:
                 f_timer = int(res_heads.get('Retry-After', 120))
@@ -370,7 +374,7 @@ class AniLister:
             json={'query': ANIME_GRAPHQL_QUERY, 'variables': self.__anilist_vars}
         )
         if res_code == 200 and resp_json.get('data', {}).get('Media'):
-            await rep.report(f"AniList API Success (no year): {self.__ani_name}", "info")
+            await rep.report(f"AniList API Success (no year): {self.__ani_name}", "info", log=False)
             return await self._parse_anilist_data(resp_json)
         elif res_code == 429:
             f_timer = int(res_heads.get('Retry-After', 120))
@@ -386,7 +390,7 @@ class AniLister:
         if res_code == 200 and resp_data:
             parsed_data = await self._parse_ann_data(resp_data)
             if parsed_data:
-                await rep.report(f"ANN API Success: {self.__ani_name}", "info")
+                await rep.report(f"ANN API Success: {self.__ani_name}", "info", log=False)
                 return parsed_data
         elif res_code == 429:
             f_timer = int(res_heads.get('Retry-After', 60))
@@ -405,15 +409,19 @@ class TextEditor:
         self.anilister = AniLister(self.__name, datetime.now().year)
 
     async def load_anilist(self):
-        cache_names = []
-        for option in [(False, False), (False, True), (True, False), (True, True)]:
-            ani_name = await self.parse_name(*option)
-            if ani_name in cache_names:
+        cache_names = set()  # Use set to avoid duplicates
+        for no_s, no_y in [(False, False), (False, True), (True, False), (True, True)]:
+            ani_name = await self.parse_name(no_s, no_y)
+            if not ani_name or ani_name in cache_names:
                 continue
-            cache_names.append(ani_name)
-            self.adata = await AniLister(ani_name, datetime.now().year).get_anidata()
+            cache_names.add(ani_name)
+            self.anilister._AniLister__ani_name = ani_name  # Update AniLister's name
+            self.adata = await self.anilister.get_anidata()
             if self.adata:
-                break
+                await rep.report(f"Used name variation: {ani_name}", "info", log=False)
+                break  # Stop after first successful API call
+        if not self.adata:
+            await rep.report(f"No data found for any name variation of {self.__name}", "error")
 
     @handle_logs
     async def get_id(self):
@@ -423,7 +431,7 @@ class TextEditor:
 
     @handle_logs
     async def parse_name(self, no_s=False, no_y=False):
-        anime_name = self.pdata.get("anime_title")
+        anime_name = self.pdata.get("anime_title") or self.__name
         anime_season = self.pdata.get("anime_season")
         anime_year = self.pdata.get("anime_year")
         if anime_name:
