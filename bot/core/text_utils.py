@@ -20,7 +20,7 @@ CAPTION_FORMAT = """
 <blockquote><b>‣</b> <i>💞Tᴏᴛᴀʟ Eᴘɪsᴏᴅᴇs:</i> <i>{t_eps}</i>
 <b>‣</b> <i>💞Gᴇɴʀᴇs:</i> <i>{genres}</i></blockquote>
 <b>✦━━━━━━━━━━━━━━━━━✦</b>
-</blockquote>⌬ <b><i>Pᴏᴡᴇʀᴇᴅ Bʏ</i></b> ~ </i></b><b><i>{cred}</i></b><blockquote>
+<blockquote>⌬ <b><i>Pᴏᴡᴇʀᴇᴅ Bʏ</i></b> ~ </i></b><b><i>{cred}</i></b></blockquote>
 
 """
 
