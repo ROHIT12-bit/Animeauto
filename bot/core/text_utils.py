@@ -254,7 +254,7 @@ class AniLister:
             "endDate": {
                 "year": anime.get("aired", {}).get("to", "").split("-")[0] if anime.get("aired", {}).get("to") else None,
                 "month": anime.get("aired", {}).get("to", "").split("-")[1] if anime.get("aired", {}).get("to") else None,
-                "day": anime.get("aired", {}).get("to", "").split("-")[2] if anime.get("aired", {}).get("to") else None
+                "day": anime.get("aired", "").split("-")[2] if anime.get("aired", {}).get("to") else None
             },
             "episodes": anime.get("episodes"),
             "genres": genres,
@@ -320,9 +320,8 @@ class AniLister:
         return None
 
     async def get_anidata(self):
-        # Try Kitsu API first
         params = {"filter[text]": self.__ani_name, "filter[seasonYear]": self.__ani_year}
-        res_code, resp_data, res_heads = await self.post_data(self.__kitsu_api, params=params)
+        res_code, resp_data, res_heads = await self.post_data(self.__kitsu_api, params=params, headers={'Accept': 'application/vnd.api+json'})
         if res_code == 200 and resp_data.get("data"):
             await rep.report(f"Kitsu API Success: {self.__ani_name}", "info")
             return await self._parse_kitsu_data(resp_data)
@@ -410,15 +409,19 @@ class TextEditor:
         self.anilister = AniLister(self.__name, datetime.now().year)
 
     async def load_anilist(self):
-        cache_names = []
-        for option in [(False, False), (False, True), (True, False), (True, True)]:
-            ani_name = await self.parse_name(*option)
-            if ani_name in cache_names:
+        cache_names = set()  # Use set to avoid duplicates
+        for no_s, no_y in [(False, False), (False, True), (True, False), (True, True)]:
+            ani_name = await self.parse_name(no_s, no_y)
+            if not ani_name or ani_name in cache_names:
                 continue
-            cache_names.append(ani_name)
-            self.adata = await AniLister(ani_name, datetime.now().year).get_anidata()
+            cache_names.add(ani_name)
+            self.anilister._AniLister__ani_name = ani_name  # Update AniLister's name
+            self.adata = await self.anilister.get_anidata()
             if self.adata:
-                break
+                await rep.report(f"Used name variation: {ani_name}", "info")
+                break  # Stop after first successful API call
+        if not self.adata:
+            await rep.report(f"No data found for any name variation of {self.__name}", "error")
 
     @handle_logs
     async def get_id(self):
@@ -428,7 +431,7 @@ class TextEditor:
 
     @handle_logs
     async def parse_name(self, no_s=False, no_y=False):
-        anime_name = self.pdata.get("anime_title")
+        anime_name = self.pdata.get("anime_title") or self.__name
         anime_season = self.pdata.get("anime_season")
         anime_year = self.pdata.get("anime_year")
         if anime_name:
