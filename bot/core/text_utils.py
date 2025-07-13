@@ -169,7 +169,7 @@ class AniLister:
     async def _handle_response(self, resp):
         if resp.status != 200:
             return (resp.status, None, resp.headers)
-        if resp.content_type not in ["application/json", "text/xml"]:
+        if resp.content_type not in ["application/json", "text/xml", "application/vnd.api+json"]:
             raise ClientResponseError(
                 resp.request_info,
                 resp.history,
@@ -179,7 +179,7 @@ class AniLister:
         if resp.content_type == "text/xml":
             return (resp.status, await resp.text(), resp.headers)
         return (resp.status, await resp.json(), resp.headers)
-    
+
     @handle_logs
     async def _parse_kitsu_data(self, data):
         if not data or not data.get("data"):
