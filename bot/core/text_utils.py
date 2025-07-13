@@ -319,7 +319,6 @@ class AniLister:
         await rep.report(f"Failed to fetch AniList ID for {name or mal_id}", "error")
         return None
 
-    @handle_logs
     async def get_anidata(self):
         # Try Kitsu API first
         params = {"filter[text]": self.__ani_name, "filter[seasonYear]": self.__ani_year}
