@@ -112,7 +112,7 @@ async def get_animes(name, torrent, force=False):
                     return
                 await rep.report("Succesfully Compressed Now Going To Upload...", "info")
                 
-                await editMessage(stat_msg, f"‣ <b>Anime Name :</b> <b><i>{filename}</i></b>\n\n<i>Ready to Upload...</i>")
+                await editMessage(stat_msg, f"<blockquote>‣ <b>Anime Name :</b> <b><i>{filename}</i></b></blockquote>\n\n<blockquote><i>Ready to Upload...</i></blockquote>")
                 await asleep(1.5)
                 try:
                     msg = await TgUploader(stat_msg).upload(out_path, qual)
