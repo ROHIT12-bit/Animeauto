@@ -11,17 +11,17 @@ from .func_utils import handle_logs
 from .reporter import rep
 
 CAPTION_FORMAT = """
-<b>㊂ <i>{title}</i></b>
+<blockquote><b>㊂ <i>{title}</i></b></blockquote>
 <b>━━━━━━━━━━━━━━━━━━━</b>
-<b>‣</b> <i>Season:</i> <i>{anime_season}</i>
-<b>‣</b> <i>Episode:</i> <i>{ep_no}</i>
-<b>‣</b> <i>Language: Japanese [ESub]</i>
-<b>‣</b> <i>Status:</i> <i>{status}</i>
-<b>‣</b> <i>Total Episodes:</i> <i>{t_eps}</i>
-<b>‣</b> <i>Genres:</i> <i>{genres}</i>
+<blockquote><b>‣</b> <i>Season:</i> <i>{anime_season}</i>
+<b>‣</b> <i>Episode:</i> <i>{ep_no}</i></blockquote>
+<blockquote><b>‣</b> <i>Audio: Japanese [ESub]</i>
+<b>‣</b> <i>Status:</i> <i>{status}</i></blockquote>
+<blockquote><b>‣</b> <i>Total Episodes:</i> <i>{t_eps}
+<b>‣</b> <i>Genres:</i> <i>{genres}</i></blockquote>
 <b>━━━━━━━━━━━━━━━━━━━</b>
 ╭┅┅┅┅┅┅┅┅┅┅┅┅┅┅┅┅┅┅┅┅
-⌬  <b><i>Powered By</i></b> ~ </i></b><b><i>{cred}</i></b>
+⌬ <b><i>Powered By</i></b> ~ </i></b><b><i>{cred}</i></b>
 ╰┅┅┅┅┅┅┅┅┅┅┅┅┅┅┅┅┅┅┅┅
 """
 
