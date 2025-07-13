@@ -11,18 +11,18 @@ from .func_utils import handle_logs
 from .reporter import rep
 
 CAPTION_FORMAT = """
-<blockquote><b>㊂ <i>{title}</i></b></blockquote>
-<b>╔━━━━━━━━━━━━━━━━━━━━━╗</b>
-<blockquote><b>‣</b> <i>Sᴇᴀsᴏɴ:</i> <i>{anime_season}</i>
-<b>‣</b> <i>Eᴘɪsᴏᴅᴇ:</i> <i>{ep_no}</i></blockquote>
-<blockquote><b>‣</b> <i>Aᴜᴅɪᴏ: Japanese [ESub]</i>
-<b>‣</b> <i>Sᴛᴀᴛᴜs:</i> <i>{status}</i></blockquote>
-<blockquote><b>‣</b> <i>Tᴏᴛᴀʟ Eᴘɪsᴏᴅᴇs:</i> <i>{t_eps}
-<b>‣</b> <i>Gᴇɴʀᴇs:</i> <i>{genres}</i></blockquote>
-<b>╚━━━━━━━━━━━━━━━━━━━━━╝</b>
-╭┅┅┅┅┅┅┅┅┅┅┅┅┅┅┅┅┅┅┅┅
-⌬ <b><i>Pᴏᴡᴇʀᴇᴅ Bʏ</i></b> ~ </i></b><b><i>{cred}</i></b>
-╰┅┅┅┅┅┅┅┅┅┅┅┅┅┅┅┅┅┅┅┅
+<blockquote><b>🌺 <i>{title}</i>🌺 </b></blockquote>
+<b>✦━━━━━━━━━━━━━━━━━━━━━━✦</b>
+<blockquote><b>‣</b> <i>❖Sᴇᴀsᴏɴ:</i> <i>{anime_season}</i>
+<b>‣</b> <i>❖Eᴘɪsᴏᴅᴇ:</i> <i>{ep_no}</i></blockquote>
+<blockquote><b>‣</b> <i>🎧Aᴜᴅɪᴏ: Japanese [ESub]</i>
+<b>‣</b> <i>📺Sᴛᴀᴛᴜs:</i> <i>{status}</i></blockquote>
+<blockquote><b>‣</b> <i>💞Tᴏᴛᴀʟ Eᴘɪsᴏᴅᴇs:</i> <i>{t_eps}</i>
+<b>‣</b> <i>💞Gᴇɴʀᴇs:</i> <i>{genres}</i></blockquote>
+<b>✦━━━━━━━━━━━━━━━━━━━━━━✦</b>
+➤➤➤➤➤➤➤➤➤
+⌬ <b>➤ <i>Pᴏᴡᴇʀᴇᴅ Bʏ</i></b> ~ </i></b><b><i>{cred}</i></b>
+➤➤➤➤➤➤➤➤➤
 """
 
 GENRES_EMOJI = {
@@ -185,7 +185,12 @@ class AniLister:
             return {}
         anime = data["data"][0] if isinstance(data["data"], list) else data["data"]
         attributes = anime.get("attributes", {})
-        genres = normalize_genres(attributes.get("genres", []))
+        # Debug: Log raw genres from Kitsu
+        genres_raw = attributes.get("genres", [])
+        await rep.report(f"Kitsu Raw Genres for {self.__ani_name}: {genres_raw}", "info", log=False)
+        genres = normalize_genres(genres_raw)
+        if not genres:
+            await rep.report(f"No valid genres found in Kitsu for {self.__ani_name}", "warning", log=False)
         return {
             "id": anime.get("id"),
             "title": {
@@ -324,7 +329,16 @@ class AniLister:
         res_code, resp_data, res_heads = await self.post_data(self.__kitsu_api, params=params, headers={'Accept': 'application/vnd.api+json'})
         if res_code == 200 and resp_data.get("data"):
             await rep.report(f"Kitsu API Success: {self.__ani_name}", "info", log=False)
-            return await self._parse_kitsu_data(resp_data)
+            result = await self._parse_kitsu_data(resp_data)
+            if not result.get("genres"):
+                # Fallback to Jikan for genres if Kitsu fails
+                jikan_params = {"q": self.__ani_name, "year": self.__ani_year}
+                j_res_code, j_resp_data, j_res_heads = await self.post_data(self.__jikan_api, params=jikan_params)
+                if j_res_code == 200 and j_resp_data.get("data"):
+                    jikan_result = await self._parse_jikan_data(j_resp_data)
+                    result["genres"] = jikan_result.get("genres", [])
+                    await rep.report(f"Fallback to Jikan for genres: {self.__ani_name}", "info", log=False)
+            return result
         elif res_code == 429:
             f_timer = int(res_heads.get('Retry-After', 60))
             await rep.report(f"Kitsu API Rate Limit: Sleeping for {f_timer}s", "error")
