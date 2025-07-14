@@ -11,6 +11,9 @@ from dotenv import load_dotenv
 from uvloop import install
 
 
+ani_cache['custom_rss'] = set()
+
+
 install()
 basicConfig(
     format="[%(asctime)s] [%(name)s | %(levelname)s] - %(message)s [%(filename)s:%(lineno)d]",
