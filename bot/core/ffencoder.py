@@ -25,15 +25,13 @@ class FFEncoder:
         self.__proc = None
         self.is_cancelled = False
         self.message = message
+        self.__name = name
         self.__qual = qual
         self.dl_path = path
         self.__total_time = None
-        self.__start_time = time()
-        # Validate and set name, fallback to a default if None
-        self.__name = name if name else f"unnamed_{int(time())}.mkv"
-        self.out_path = ospath.join("encode", self.__name)
+        self.out_path = ospath.join("encode", name)
         self.__prog_file = 'prog.txt'
-        LOGS.info(f"Initialized FFEncoder with name: {self.__name}, out_path: {self.out_path}")
+        self.__start_time = time()
 
     async def progress(self):
         self.__total_time = await mediainfo(self.dl_path, get_duration=True)
@@ -76,15 +74,11 @@ class FFEncoder:
             LOGS.info("Progress Temp Generated !")
             pass
         
-        dl_npath = ospath.join("encode", "ffanimeadvin.mkv")
-        out_npath = ospath.join("encode", "ffanimeadvout.mkv")
-        if not all(ospath.exists(ospath.dirname(p)) or ospath.isdir(ospath.dirname(p)) for p in [dl_npath, out_npath, self.out_path]):
-            await rep.report(f"Invalid directory for paths: {dl_npath}, {out_npath}, {self.out_path}", "error")
-            return
-        
+        dl_npath, out_npath = ospath.join("encode", "ffanimeadvin.mkv"), ospath.join("encode", "ffanimeadvout.mkv")
         await aiorename(self.dl_path, dl_npath)
         
         ffcode = ffargs[self.__qual].format(dl_npath, self.__prog_file, out_npath)
+        
         LOGS.info(f'FFCode: {ffcode}')
         self.__proc = await create_subprocess_shell(ffcode, stdout=PIPE, stderr=PIPE)
         proc_pid = self.__proc.pid
