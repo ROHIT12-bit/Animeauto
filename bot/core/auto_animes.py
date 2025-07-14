@@ -31,7 +31,9 @@ async def fetch_animes():
     while True:
         await asleep(5)
         if ani_cache['fetch_animes']:
-            for link in Var.RSS_ITEMS:
+            # ✅ Merge default RSS and custom RSS
+            all_rss = Var.RSS_ITEMS + list(ani_cache.get("custom_rss", []))
+            for link in all_rss:
                 if (info := await getfeed(link, 0)):
                     if info.link in processed_links:
                         continue
