@@ -11,17 +11,6 @@ from dotenv import load_dotenv
 from uvloop import install
 
 
-# Define ani_cache first
-ani_cache = {
-    'fetch_animes': True,
-    'ongoing': set(),
-    'completed': set()
-}
-
-# Then add custom_rss key
-ani_cache['custom_rss'] = set()
-
-
 install()
 basicConfig(
     format="[%(asctime)s] [%(name)s | %(levelname)s] - %(message)s [%(filename)s:%(lineno)d]",
@@ -39,6 +28,9 @@ ani_cache = {
     'fetch_animes': True,
     'ongoing': set(),
     'completed': set()
+# Then add custom_rss key
+ani_cache['custom_rss'] = set()
+    
 }
 ffpids_cache = list()
 ffLock = Lock()
