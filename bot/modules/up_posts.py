@@ -1,58 +1,42 @@
-from json import loads as jloads
-from os import path as ospath, execl
-from sys import executable
-from bot import bot
-from aiohttp import ClientSession
-from bot import Var, bot, ffQueue
-from pyrogram.types import InlineKeyboardButton, InlineKeyboardMarkup
-from pyrogram.errors import FloodWait, MessageNotModified
-from telegram import Update
-from telegram import ParseMode
-from telegram.ext import CallbackContext, CommandHandler
-from pyrogram import Client, filters
-from bot.core.text_utils import TextEditor
-from bot.core.reporter import rep
-from bot.core.func_utils import decode, is_fsubbed, get_fsubs, editMessage, sendMessage, new_task, convertTime, getfeed
-from asyncio import sleep as asleep, gather
-from pyrogram.filters import command, private, user
 import time
-from datetime import datetime
-from motor.motor_asyncio import AsyncIOMotorClient
-from pyrogram.types import Message
-from pyrogram.types import Message
-import subprocess
-from pyrogram.types import InlineKeyboardButton, InlineKeyboardMarkup
-from pyrogram.errors import FloodWait, MessageNotModified
-
-from bot import bot, bot_loop, Var, ani_cache
-
-from json import loads as jloads
-from os import path as ospath, execl
-from sys import executable
-from bot import bot, bot_loop, Var, ani_cache
-from aiohttp import ClientSession
-from bot import Var, bot, ffQueue
-from pyrogram.types import InlineKeyboardButton, InlineKeyboardMarkup
-from pyrogram.errors import FloodWait, MessageNotModified
-from pyrogram import Client, filters
-from bot.core.text_utils import TextEditor
-from bot.core.reporter import rep
-from bot.core.func_utils import decode, is_fsubbed, get_fsubs, editMessage, sendMessage, new_task, convertTime, getfeed
-from asyncio import sleep as asleep, gather
-from pyrogram.filters import command, private, user
-import time
-from datetime import datetime
-from motor.motor_asyncio import AsyncIOMotorClient
-from pyrogram.types import Message
 import subprocess
 import logging
+from datetime import datetime
+from json import loads as jloads
+from os import path as ospath, execl
+from sys import executable
+from asyncio import sleep as asleep, gather
+
+from aiohttp import ClientSession
+from motor.motor_asyncio import AsyncIOMotorClient
+
+# Pyrogram imports
+from pyrogram import Client, filters
+from pyrogram.errors import FloodWait, MessageNotModified
+from pyrogram.filters import command, private, user
+from pyrogram.types import Message, InlineKeyboardButton, InlineKeyboardMarkup
+
+# python-telegram-bot imports (keep Update & CallbackContext)
+from telegram import Update, ParseMode
+from telegram.ext import CallbackContext, CommandHandler
+
+# Bot internal imports
+from bot import bot, bot_loop, Var, ani_cache, ffQueue
+from bot.core.text_utils import TextEditor
+from bot.core.reporter import rep
+from bot.core.func_utils import (
+    decode, is_fsubbed, get_fsubs, editMessage,
+    sendMessage, new_task, convertTime, getfeed
+)
 
 # Setup logging
 LOGGER = logging.getLogger(__name__)
 
+# MongoDB setup
 DB_URI = "mongodb+srv://vinayjaat698:jaat@jaat.olaya.mongodb.net/?retryWrites=true&w=majority&appName=jaat"
 mongo_client = AsyncIOMotorClient(DB_URI)
 db = mongo_client['AutoAniOngoing']
+
 
 def get_readable_time(seconds: int) -> str:
     count = 0
@@ -75,17 +59,20 @@ def get_readable_time(seconds: int) -> str:
     up_time += ":".join(time_list)
     return up_time
 
+
 async def get_db_response_time() -> float:
     start = time.time()
     await db.command("ping")
     end = time.time()
     return round((end - start) * 1000, 2)
 
+
 async def get_ping(bot: Client) -> float:
     start = time.time()
     await bot.get_me()
     end = time.time()
     return round((end - start) * 1000, 2)
+
 
 @bot.on_message(filters.command('ping') & filters.user(Var.ADMINS))
 @new_task
@@ -109,6 +96,7 @@ async def stats(client: Client, message: Message):
         await message.reply_text(stats_text)
     except Exception as e:
         await message.reply_text(f"Error in ping command: {str(e)}")
+
 
 @bot.on_message(filters.command('shell') & filters.private & filters.user(Var.ADMINS))
 @new_task
@@ -144,6 +132,7 @@ async def shell(client: Client, message: Message):
     else:
         await message.reply_text(reply, parse_mode="markdown")
 
+
 @bot.on_message(filters.command("ongoing"))
 @new_task
 async def ongoing_animes(client: Client, message: Message):
@@ -165,6 +154,7 @@ async def ongoing_animes(client: Client, message: Message):
     await rep.report("Auto Restarting...!!!", "info")
     execl(executable, executable, "-m", "bot")
 
+
 async def update_shdr(name, link):
     if TD_SCHR is not None:
         TD_lines = TD_SCHR.text.split('\n')
@@ -172,6 +162,7 @@ async def update_shdr(name, link):
             if line.startswith(f"📌 {name}"):
                 TD_lines[i+2] = f"    • **Status :** ✅ __Uploaded__\n    • **Link :** {link}"
         await TD_SCHR.edit("\n".join(TD_lines))
+
 
 async def upcoming_animes():
     if Var.SEND_SCHEDULE:
