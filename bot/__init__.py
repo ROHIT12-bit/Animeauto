@@ -11,6 +11,14 @@ from dotenv import load_dotenv
 from uvloop import install
 
 
+# Define ani_cache first
+ani_cache = {
+    'fetch_animes': True,
+    'ongoing': set(),
+    'completed': set()
+}
+
+# Then add custom_rss key
 ani_cache['custom_rss'] = set()
 
 
