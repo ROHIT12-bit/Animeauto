@@ -11,7 +11,7 @@ from .func_utils import handle_logs
 from .reporter import rep
 
 CAPTION_FORMAT = """
-<blockquote><b>🌺 <i>{title}</i>🌺 </b></blockquote>
+<blockquote><b>🌺 <i>{title}</i> 🌺 </b></blockquote>
 <b>✦━━━━━━━━━━━━━━━━━✦</b>
 <blockquote><b>‣</b> <i>❖Sᴇᴀsᴏɴ:</i> <i>{anime_season}</i>
 <b>‣</b> <i>❖Eᴘɪsᴏᴅᴇ:</i> <i>{ep_no}</i></blockquote>
@@ -149,7 +149,7 @@ class AniLister:
         self.__ani_name = anime_name
         self.__ani_year = year
         self.__anilist_vars = {'search': self.__ani_name, 'seasonYear': self.__ani_year}
-        self.__anilist_retries = 3  # Limit AniList retries to avoid floodwait loops
+        self.__anilist_retries = 3
 
     async def post_data(self, api: str, params: dict = None, json: dict = None, headers: dict = None):
         try:
@@ -184,7 +184,6 @@ class AniLister:
             return {}
         anime = data["data"][0] if isinstance(data["data"], list) else data["data"]
         attributes = anime.get("attributes", {})
-        # Debug: Log raw genres from Kitsu
         genres_raw = attributes.get("genres", [])
         await rep.report(f"Kitsu Raw Genres for {self.__ani_name}: {genres_raw}", "info", log=False)
         genres = normalize_genres(genres_raw)
@@ -302,16 +301,18 @@ class AniLister:
 
     @handle_logs
     async def get_anilist_id(self, mal_id: int = None, name: str = None, year: int = None):
-        """Attempt to fetch AniList ID using MAL ID or name/year."""
+        """Attempt to fetch AniList ID with debugging and retries."""
         if mal_id:
             variables = {'idMal': mal_id}
         else:
             variables = {'search': name, 'seasonYear': year} if year else {'search': name}
+        await rep.report(f"Attempting AniList ID fetch with variables: {variables}", "info", log=False)
         res_code, resp_json, res_heads = await self.post_data(
             self.__anilist_api,
             json={'query': ANIME_GRAPHQL_QUERY, 'variables': variables}
         )
         if res_code == 200 and resp_json.get('data', {}).get('Media'):
+            await rep.report(f"Successfully fetched AniList ID for {name or mal_id}", "info", log=False)
             return resp_json['data']['Media']['id']
         elif res_code == 429:
             f_timer = int(res_heads.get('Retry-After', 120))
@@ -320,17 +321,16 @@ class AniLister:
                 self.__anilist_retries -= 1
                 await asleep(f_timer)
                 return await self.get_anilist_id(mal_id, name, year)
-        await rep.report(f"Failed to fetch AniList ID for {name or mal_id}", "error")
+        await rep.report(f"Failed to fetch AniList ID for {name or mal_id} (Status: {res_code})", "error")
         return None
 
     async def get_anidata(self):
-        params = {"filter[text]": self.__ani_name, "filter[seasonYear]": self.__ani_year}
+        params = {"filter[text]": self.__ani_name, "filter[seasonYear": self.__ani_year}
         res_code, resp_data, res_heads = await self.post_data(self.__kitsu_api, params=params, headers={'Accept': 'application/vnd.api+json'})
         if res_code == 200 and resp_data.get("data"):
             await rep.report(f"Kitsu API Success: {self.__ani_name}", "info", log=False)
             result = await self._parse_kitsu_data(resp_data)
             if not result.get("genres"):
-                # Fallback to Jikan for genres if Kitsu fails
                 jikan_params = {"q": self.__ani_name, "year": self.__ani_year}
                 j_res_code, j_resp_data, j_res_heads = await self.post_data(self.__jikan_api, params=jikan_params)
                 if j_res_code == 200 and j_resp_data.get("data"):
@@ -344,7 +344,6 @@ class AniLister:
             await asleep(f_timer)
             return await self.get_anidata()
 
-        # Fallback to Jikan API (second priority)
         params = {"q": self.__ani_name, "year": self.__ani_year}
         res_code, resp_data, res_heads = await self.post_data(self.__jikan_api, params=params)
         if res_code == 200 and resp_data.get("data"):
@@ -356,7 +355,6 @@ class AniLister:
             await asleep(f_timer)
             return await self.get_anidata()
 
-        # Fallback to AniList API (third priority due to floodwait errors)
         for year in range(self.__ani_year, 2020, -1):
             self.__anilist_vars['seasonYear'] = year
             res_code, resp_json, res_heads = await self.post_data(
@@ -380,7 +378,6 @@ class AniLister:
                 await asleep(5)
                 continue
 
-        # Try AniList without year as a further attempt
         self.__anilist_vars = {'search': self.__ani_name}
         res_code, resp_json, res_heads = await self.post_data(
             self.__anilist_api,
@@ -397,7 +394,6 @@ class AniLister:
                 await asleep(f_timer)
                 return await self.get_anidata()
 
-        # Fallback to ANN API (last priority)
         params = {"title": self.__ani_name, "type": "anime"}
         res_code, resp_data, res_heads = await self.post_data(self.__ann_api, params=params)
         if res_code == 200 and resp_data:
@@ -420,18 +416,19 @@ class TextEditor:
         self.adata = {}
         self.pdata = parse(name)
         self.anilister = AniLister(self.__name, datetime.now().year)
+        self.output_dir = Var.OUTPUT_DIR if hasattr(Var, 'OUTPUT_DIR') else "/usr/src/app/output"
 
     async def load_anilist(self):
-        cache_names = set()  # Use set to avoid duplicates
+        cache_names = set()
         for no_s, no_y in [(False, False), (False, True), (True, False), (True, True)]:
             ani_name = await self.parse_name(no_s, no_y)
             if not ani_name or ani_name in cache_names:
                 continue
             cache_names.add(ani_name)
-            self.anilister._AniLister__ani_name = ani_name  # Update AniLister's name
+            self.anilister._AniLister__ani_name = ani_name
             self.adata = await self.anilister.get_anidata()
             if self.adata:
-                break  
+                break
 
     @handle_logs
     async def get_id(self):
@@ -455,16 +452,14 @@ class TextEditor:
 
     @handle_logs
     async def get_poster(self):
-        # Try to get AniList ID regardless of API source
         anime_id = None
-        if self.adata.get("idMal") or "Media" in self.adata:  # AniList data
+        if self.adata.get("idMal") or "Media" in self.adata:
             anime_id = self.adata.get("id")
-        elif self.adata.get("id"):  # Jikan, Kitsu, or ANN data
+        elif self.adata.get("id"):
             mal_id = self.adata.get("id") if "mal_id" in self.adata else None
             name = self.adata.get("title", {}).get("romaji") or self.adata.get("title", {}).get("english") or self.__name
             year = self.adata.get("startDate", {}).get("year") or self.anilister._AniLister__ani_year
             anime_id = await self.anilister.get_anilist_id(mal_id=mal_id, name=name, year=year)
-        
         if anime_id and str(anime_id).isdigit():
             return f"https://img.anili.st/media/{anime_id}"
         return "https://envs.sh/YsH.jpg"
@@ -472,12 +467,19 @@ class TextEditor:
     @handle_logs
     async def get_upname(self, qual=""):
         anime_name = self.pdata.get("anime_title")
-        codec = 'HEVC' if 'libx265' in ffargs[qual] else 'AV1' if 'libaom-av1' in ffargs[qual] else ''
+        if not anime_name:
+            await rep.report(f"No anime title parsed for {self.__name}", "error")
+            return None
+        codec = 'HEVC' if 'libx265' in ffargs.get(qual, '') else 'AV1' if 'libaom-av1' in ffargs.get(qual, '') else ''
         lang = 'SUB' if 'sub' in self.__name.lower() else 'Sub'
         anime_season = str(ani_s[-1]) if (ani_s := self.pdata.get('anime_season', '01')) and isinstance(ani_s, list) else str(ani_s)
-        if anime_name and self.pdata.get("episode_number"):
+        if self.pdata.get("episode_number"):
             titles = self.adata.get('title', {})
-            return f"""[S{anime_season}-{'E'+str(self.pdata.get('episode_number')) if self.pdata.get('episode_number') else ''}] {titles.get('english') or titles.get('romaji') or titles.get('native')} {'['+qual+'p]' if qual else ''} {'['+codec.upper()+'] ' if codec else ''}{'['+lang+']'} {Var.BRAND_UNAME}.mkv"""
+            upname = f"[S{anime_season}-E{self.pdata.get('episode_number')}] {titles.get('english') or titles.get('romaji') or titles.get('native') or anime_name}"
+            upname += f" [{qual}p]" if qual else ""
+            upname += f" [{codec.upper()}] " if codec else ""
+            upname += f"[{lang}] {Var.BRAND_UNAME}.mkv"
+            return os.path.join(self.output_dir, upname) if self.output_dir and upname else None
         return None
 
     @handle_logs
@@ -498,15 +500,10 @@ class TextEditor:
         
         return CAPTION_FORMAT.format(
             title=titles.get('english') or titles.get('romaji') or titles.get('native') or "N/A",
-            form=self.adata.get("format") or "N/A",
-            genres=", ".join(f"{GENRES_EMOJI[x]} #{x.replace(' ', '_').replace('-', '_')}" for x in (self.adata.get('genres') or [])),
-            avg_score=f"{sc}%" if (sc := self.adata.get('averageScore')) else "N/A",
-            status=self.adata.get("status") or "N/A",
-            start_date=startdate,
-            end_date=enddate,
-            t_eps=self.adata.get("episodes") or "N/A",
             anime_season=str(ani_s[-1]) if (ani_s := self.pdata.get('anime_season', '01')) and isinstance(ani_s, list) else str(ani_s),
-            plot=(desc if (desc := self.adata.get("description") or "N/A") and len(desc) < 200 else desc[:200] + "...") if self.adata.get("description") else "N/A",
             ep_no=self.pdata.get("episode_number") or "N/A",
+            status=self.adata.get("status") or "N/A",
+            t_eps=self.adata.get("episodes") or "N/A",
+            genres=", ".join(f"{GENRES_EMOJI[x]} #{x.replace(' ', '_').replace('-', '_')}" for x in (self.adata.get('genres') or [])),
             cred=Var.BRAND_UNAME,
         )
