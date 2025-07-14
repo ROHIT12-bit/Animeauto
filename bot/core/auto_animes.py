@@ -26,7 +26,7 @@ btn_formatter = {
     '360':'𝟯𝟲𝟬𝗣'
 }
 
-@bot.on_message(filters.command("addrss") & filters.user(Var.OWNER_ID))
+@bot.on_message(filters.command("addrss") & filters.user(Var.ADMINS))
 async def add_custom_rss(client, message: Message):
     if len(message.command) < 2:
         await message.reply_text("❗ Usage:\n<code>/addrss https://example.com/rss</code>")
@@ -40,7 +40,7 @@ async def add_custom_rss(client, message: Message):
     ani_cache["custom_rss"].add(url)
     await message.reply_text(f"✅ RSS feed added:\n<code>{url}</code>")
 
-@bot.on_message(filters.command("listrss") & filters.user(Var.OWNER_ID))
+@bot.on_message(filters.command("listrss") & filters.user(Var.ADMINS))
 async def list_rss(client, message: Message):
     feeds = list(ani_cache.get("custom_rss", []))
     if not feeds:
@@ -48,7 +48,7 @@ async def list_rss(client, message: Message):
     else:
         await message.reply_text("📡 Custom RSS Feeds:\n" + "\n".join([f"• {f}" for f in feeds]))
 
-@bot.on_message(filters.command("removerss") & filters.user(Var.OWNER_ID))
+@bot.on_message(filters.command("removerss") & filters.user(Var.ADMINS))
 async def remove_rss(client, message: Message):
     if len(message.command) < 2:
         await message.reply_text("❗ Usage:\n<code>/removerss https://example.com/rss</code>")
@@ -62,7 +62,7 @@ async def remove_rss(client, message: Message):
         await message.reply_text("⚠️ RSS link not found in custom list.")
 
 
-@bot.on_message(filters.command("addrss") & filters.user(Var.OWNER_ID))
+@bot.on_message(filters.command("addrss") & filters.user(Var.ADMINS))
 async def add_custom_rss(client, message: Message):
     if len(message.command) < 2:
         await message.reply_text("❗ Usage:\n<code>/addrss https://example.com/rss</code>")
