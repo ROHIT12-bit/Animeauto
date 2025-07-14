@@ -28,10 +28,11 @@ ani_cache = {
     'fetch_animes': True,
     'ongoing': set(),
     'completed': set()
-# Then add custom_rss key
-ani_cache['custom_rss'] = set()
-    
 }
+
+# Add the key **after** dictionary creation
+ani_cache['custom_rss'] = set()
+
 ffpids_cache = list()
 ffLock = Lock()
 ffQueue = Queue()
