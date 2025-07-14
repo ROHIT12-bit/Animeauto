@@ -455,18 +455,22 @@ class TextEditor:
 
     @handle_logs
     async def get_poster(self):
-        # Try to get AniList ID regardless of API source
         anime_id = None
-        if self.adata.get("idMal") or "Media" in self.adata:  # AniList data
+        if self.adata.get("idMal") or "Media" in self.adata:
             anime_id = self.adata.get("id")
-        elif self.adata.get("id"):  # Jikan, Kitsu, or ANN data
+        elif self.adata.get("id"):
             mal_id = self.adata.get("id") if "mal_id" in self.adata else None
             name = self.adata.get("title", {}).get("romaji") or self.adata.get("title", {}).get("english") or self.__name
             year = self.adata.get("startDate", {}).get("year") or self.anilister._AniLister__ani_year
             anime_id = await self.anilister.get_anilist_id(mal_id=mal_id, name=name, year=year)
-        
+
         if anime_id and str(anime_id).isdigit():
             return f"https://img.anili.st/media/{anime_id}"
+
+        poster_url = self.adata.get("coverImage", {}).get("large")
+        if poster_url and poster_url.startswith("http"):
+            return poster_url
+
         return "https://envs.sh/YsH.jpg"
 
     @handle_logs
