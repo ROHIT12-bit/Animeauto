@@ -453,21 +453,45 @@ class TextEditor:
             return pname
         return anime_name
 
-    @handle_logs
-    async def get_poster(self):
-        # Try to get AniList ID regardless of API source
-        anime_id = None
-        if self.adata.get("idMal") or "Media" in self.adata:  # AniList data
-            anime_id = self.adata.get("id")
-        elif self.adata.get("id"):  # Jikan, Kitsu, or ANN data
-            mal_id = self.adata.get("id") if "mal_id" in self.adata else None
-            name = self.adata.get("title", {}).get("romaji") or self.adata.get("title", {}).get("english") or self.__name
-            year = self.adata.get("startDate", {}).get("year") or self.anilister._AniLister__ani_year
-            anime_id = await self.anilister.get_anilist_id(mal_id=mal_id, name=name, year=year)
-        
-        if anime_id and str(anime_id).isdigit():
-            return f"https://img.anili.st/media/{anime_id}"
-        return "https://envs.sh/YsH.jpg"
+@handle_logs
+async def get_poster(self):
+    # Try to get AniList ID regardless of API source
+    anime_id = None
+    if self.adata.get("idMal") or "Media" in self.adata:  # AniList data
+        anime_id = self.adata.get("id")
+    elif self.adata.get("id"):  # Jikan, Kitsu, or ANN data
+        mal_id = self.adata.get("id") if "mal_id" in self.adata else None
+        name = self.adata.get("title", {}).get("romaji") or self.adata.get("title", {}).get("english") or self.__name
+        year = self.adata.get("startDate", {}).get("year") or self.anilister._AniLister__ani_year
+        anime_id = await self.anilister.get_anilist_id(mal_id=mal_id, name=name, year=year)
+    
+    # Try AniList poster if ID is available
+    if anime_id and str(anime_id).isdigit():
+        anilist_poster = f"https://img.anili.st/media/{anime_id}"
+        # Verify if the AniList poster URL is valid
+        async with ClientSession() as sess:
+            try:
+                async with sess.head(anilist_poster, timeout=5) as resp:
+                    if resp.status == 200:
+                        return anilist_poster
+                    await rep.report(f"AniList poster not found for ID {anime_id}", "warning")
+            except Exception as e:
+                await rep.report(f"AniList poster check failed: {str(e)}", "error")
+
+    # Fallback 1: Try coverImage from adata (from any API: Jikan, Kitsu, ANN)
+    cover_image = self.adata.get("coverImage", {}).get("large")
+    if cover_image and await self._is_valid_url(cover_image):
+        await rep.report(f"Using cover image from adata: {cover_image}", "info", log=False)
+        return cover_image
+
+    # Fallback 2: Try Jikan API for poster
+    jikan_params = {"q": self.__name, "year": self.anilister._AniLister__ani_year}
+    res_code, jikan_data, _ = await self.anilister.post_data(self.anilister._AniLister__jikan_api, params=jikan_params)
+    if res_code == 200 and jikan_data.get("data"):
+        jikan_result = await self.anilister._parse_jikan_data(jikan_data)
+        jikan_poster = jikan_result.get("coverImage", {}).get("large")
+        if jikan_p --
+
 
     @handle_logs
     async def get_upname(self, qual=""):
