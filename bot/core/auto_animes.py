@@ -27,12 +27,17 @@ btn_formatter = {
 
 async def fetch_animes():
     await rep.report("Fetching Anime Started !!!", "info")
+    processed_links = set()  # Avoid duplicates across feeds
     while True:
         await asleep(5)
         if ani_cache['fetch_animes']:
             for link in Var.RSS_ITEMS:
                 if (info := await getfeed(link, 0)):
+                    if info.link in processed_links:
+                        continue
+                    processed_links.add(info.link)
                     bot_loop.create_task(get_animes(info.title, info.link))
+
 
 async def get_animes(name, torrent, force=False):
     try:
