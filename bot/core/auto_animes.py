@@ -6,7 +6,7 @@ from aiofiles.os import remove as aioremove
 from traceback import format_exc
 from base64 import urlsafe_b64encode
 from time import time
-from pyrogram import Client, filters
+from pyrogram import filters
 from pyrogram.types import InlineKeyboardButton, InlineKeyboardMarkup, Message
 
 from bot import bot, bot_loop, Var, ani_cache, ffQueue, ffLock, ff_queued, ani_cache
