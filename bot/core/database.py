@@ -7,7 +7,7 @@ class MongoDB:
         self.__db = self.__client[database_name]
         self.__animes = self.__db.animes[Var.BOT_TOKEN.split(':')[0]]
 
-    async def getAnime(self, ani_id):
+    async def get_anime(self, ani_id):
         botset = await self.__animes.find_one({'_id': ani_id})
         return botset or {}
 
