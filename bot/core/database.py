@@ -12,7 +12,7 @@ class MongoDB:
         return botset or {}
 
     async def saveAnime(self, ani_id, ep, qual, post_id=None):
-        quals = (await self.getAnime(ani_id)).get(ep, {qual: False for qual in Var.QUALS})
+        quals = (await self.get_anime(ani_id)).get(ep, {qual: False for qual in Var.QUALS})
         quals[qual] = True
         await self.__animes.update_one({'_id': ani_id}, {'$set': {ep: quals}}, upsert=True)
         if post_id:
