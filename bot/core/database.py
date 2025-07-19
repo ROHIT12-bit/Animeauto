@@ -7,12 +7,12 @@ class MongoDB:
         self.__db = self.__client[database_name]
         self.__animes = self.__db.animes[Var.BOT_TOKEN.split(':')[0]]
 
-    async def get_anime(self, ani_id):
+    async def getAnime(self, ani_id):
         botset = await self.__animes.find_one({'_id': ani_id})
         return botset or {}
 
     async def saveAnime(self, ani_id, ep, qual, post_id=None):
-        quals = (await self.get_anime(ani_id)).get(ep, {qual: False for qual in Var.QUALS})
+        quals = (await self.getAnime(ani_id)).get(ep, {qual: False for qual in Var.QUALS})
         quals[qual] = True
         await self.__animes.update_one({'_id': ani_id}, {'$set': {ep: quals}}, upsert=True)
         if post_id:
