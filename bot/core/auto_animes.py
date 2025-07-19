@@ -6,10 +6,9 @@ from aiofiles.os import remove as aioremove
 from traceback import format_exc
 from base64 import urlsafe_b64encode
 from time import time
-from pyrogram import filters
-from pyrogram.types import InlineKeyboardButton, InlineKeyboardMarkup, Message
+from pyrogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 
-from bot import bot, bot_loop, Var, ani_cache, ffQueue, ffLock, ff_queued, ani_cache
+from bot import bot, bot_loop, Var, ani_cache, ffQueue, ffLock, ff_queued
 from .tordownload import TorDownloader
 from .database import db
 from .func_utils import getfeed, encode, editMessage, sendMessage, convertBytes
@@ -26,71 +25,14 @@ btn_formatter = {
     '360':'𝟯𝟲𝟬𝗣'
 }
 
-@bot.on_message(filters.command("addrss") & filters.user(Var.ADMINS))
-async def add_custom_rss(client, message: Message):
-    if len(message.command) < 2:
-        await message.reply_text("❗ Usage:\n<code>/addrss https://example.com/rss</code>")
-        return
-
-    url = message.command[1]
-    if not url.startswith("http"):
-        await message.reply_text("⚠️ Invalid URL format.")
-        return
-
-    ani_cache["custom_rss"].add(url)
-    await message.reply_text(f"✅ RSS feed added:\n<code>{url}</code>")
-
-@bot.on_message(filters.command("listrss") & filters.user(Var.ADMINS))
-async def list_rss(client, message: Message):
-    feeds = list(ani_cache.get("custom_rss", []))
-    if not feeds:
-        await message.reply_text("⚠️ No custom RSS links added yet.")
-    else:
-        await message.reply_text("📡 Custom RSS Feeds:\n" + "\n".join([f"• {f}" for f in feeds]))
-
-@bot.on_message(filters.command("removerss") & filters.user(Var.ADMINS))
-async def remove_rss(client, message: Message):
-    if len(message.command) < 2:
-        await message.reply_text("❗ Usage:\n<code>/removerss https://example.com/rss</code>")
-        return
-
-    url = message.command[1]
-    if url in ani_cache.get("custom_rss", set()):
-        ani_cache["custom_rss"].remove(url)
-        await message.reply_text(f"❌ Removed:\n<code>{url}</code>")
-    else:
-        await message.reply_text("⚠️ RSS link not found in custom list.")
-
-
-@bot.on_message(filters.command("addrss") & filters.user(Var.ADMINS))
-async def add_custom_rss(client, message: Message):
-    if len(message.command) < 2:
-        await message.reply_text("❗ Usage:\n<code>/addrss https://example.com/rss</code>")
-        return
-
-    url = message.command[1]
-    if not url.startswith("http"):
-        await message.reply_text("⚠️ Invalid URL format.")
-        return
-
-    ani_cache["custom_rss"].add(url)
-    await message.reply_text(f"✅ RSS feed added:\n<code>{url}</code>")
-
 async def fetch_animes():
     await rep.report("Fetching Anime Started !!!", "info")
-    processed_links = set()  # Avoid duplicates across feeds
     while True:
         await asleep(5)
         if ani_cache['fetch_animes']:
-            # ✅ Merge default RSS and custom RSS
-            all_rss = Var.RSS_ITEMS + list(ani_cache.get("custom_rss", []))
-            for link in all_rss:
+            for link in Var.RSS_ITEMS:
                 if (info := await getfeed(link, 0)):
-                    if info.link in processed_links:
-                        continue
-                    processed_links.add(info.link)
                     bot_loop.create_task(get_animes(info.title, info.link))
-
 
 async def get_animes(name, torrent, force=False):
     try:
@@ -103,7 +45,7 @@ async def get_animes(name, torrent, force=False):
             return
         if not force and ani_id in ani_cache['completed']:
             return
-        if force or (not (ani_data := await db.get_anime(ani_id)) \
+        if force or (not (ani_data := await db.getAnime(ani_id)) \
             or (ani_data and not (qual_data := ani_data.get(ep_no))) \
             or (ani_data and qual_data and not all(qual for qual in qual_data.values()))):
             
